@@ -1,0 +1,6 @@
+github.com/odvcencio/gotreesitter v0.20.1 h1:h6aiS5AvXhpfCdLzOSQui8IYkJBmH+tZuujInZzVxFw=
+github.com/odvcencio/gotreesitter v0.20.1/go.mod h1:hBVkghd0paaYAVwd2087vfwdeU984bQbMo9LvpE0moo=
+github.com/slyrz/warc v0.0.0-20150806225202-a50edd19b690 h1:2RLSydlHktw3Fo4nwOQwjexn1d49KJb/i+EmlT4D878=
+github.com/slyrz/warc v0.0.0-20150806225202-a50edd19b690/go.mod h1:LuhAhBK7l5/QEJmiz3tVGLi8n0IwqAwLX/ndr+6XSDE=
+github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=
+github.com/spf13/pflag v1.0.10/go.mod h1:McXfInJRrz4CZXVZOBLb0bTZqETkiAhM9Iw0y3An2Bg=

@@ -1,0 +1,7 @@
+/placer
+/jsluice
+*.test
+*.out
+*.pprof
+coverage.txt
+.DS_Store
