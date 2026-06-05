@@ -13,6 +13,7 @@ import (
 	"sync"
 
 	"github.com/m31-labs/placer"
+	"github.com/pkg/profile"
 	"github.com/slyrz/warc"
 	flag "github.com/spf13/pflag"
 )
@@ -87,6 +88,9 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	if opts.help {
 		usage(stderr)
 		return nil
+	}
+	if opts.profile {
+		defer profile.Start(profile.ProfilePath(".")).Stop()
 	}
 	rest := fs.Args()
 	if len(rest) == 0 {
@@ -420,7 +424,7 @@ func usage(w io.Writer) {
 		"  secrets   Extract secrets and other interesting bits",
 		"  tree      Print syntax trees for input files",
 		"  query     Run tree-sitter a query against input files",
-		"  format    Format JavaScript source using a lightweight formatter",
+		"  format    Format JavaScript source using jsbeautifier-go",
 	}
 	fmt.Fprintln(w, strings.Join(lines, "\n"))
 }

@@ -5,6 +5,7 @@ import (
 	"strconv"
 	"strings"
 
+	"github.com/ditashi/jsbeautifier-go/jsbeautifier"
 	"github.com/odvcencio/gotreesitter"
 )
 
@@ -302,7 +303,8 @@ func walkCompatNode(n *Node, fn func(*Node), namedOnly bool) {
 }
 
 func (n *Node) Format() (string, error) {
-	return formatJavaScript(n.Content()), nil
+	source := n.Content()
+	return jsbeautifier.Beautify(&source, jsbeautifier.DefaultOptions())
 }
 
 func (n *Node) Query(query string, fn func(*Node)) {

@@ -1,5 +1,9 @@
+github.com/ditashi/jsbeautifier-go v0.0.0-20141206144643-2520a8026a9c h1:+Zo5Ca9GH0RoeVZQKzFJcTLoAixx5s5Gq3pTIS+n354=
+github.com/ditashi/jsbeautifier-go v0.0.0-20141206144643-2520a8026a9c/go.mod h1:HJGU9ULdREjOcVGZVPB5s6zYmHi1RxzT71l2wQyLmnE=
 github.com/odvcencio/gotreesitter v0.20.1 h1:h6aiS5AvXhpfCdLzOSQui8IYkJBmH+tZuujInZzVxFw=
 github.com/odvcencio/gotreesitter v0.20.1/go.mod h1:hBVkghd0paaYAVwd2087vfwdeU984bQbMo9LvpE0moo=
+github.com/pkg/profile v1.6.0 h1:hUDfIISABYI59DyeB3OTay/HxSRwTQ8rB/H83k6r5dM=
+github.com/pkg/profile v1.6.0/go.mod h1:qBsxPvzyUincmltOk6iyRVxHYg4adc0OFOv72ZdLa18=
 github.com/slyrz/warc v0.0.0-20150806225202-a50edd19b690 h1:2RLSydlHktw3Fo4nwOQwjexn1d49KJb/i+EmlT4D878=
 github.com/slyrz/warc v0.0.0-20150806225202-a50edd19b690/go.mod h1:LuhAhBK7l5/QEJmiz3tVGLi8n0IwqAwLX/ndr+6XSDE=
 github.com/spf13/pflag v1.0.10 h1:4EBh2KAYBwaONj6b2Ye1GiHfwjqyROoF4RwYO+vPwFk=

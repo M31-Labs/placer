@@ -105,6 +105,48 @@ func TestJSLuiceCompatUserPattern(t *testing.T) {
 	}
 }
 
+func TestJSLuiceCompatCustomMatchers(t *testing.T) {
+	analyzer := NewAnalyzer([]byte(`
+var config = {
+  contact: "mailto:contact@example.com",
+  apiKey: "AUTH_1a2b3c"
+}
+`))
+	analyzer.DisableDefaultURLMatchers()
+	analyzer.AddURLMatcher(URLMatcher{"string", func(n *Node) *URL {
+		value := n.DecodedString()
+		if !strings.HasPrefix(value, "mailto:") {
+			return nil
+		}
+		return &URL{URL: value, Type: "mailto"}
+	}})
+	urls := analyzer.GetURLs()
+	if len(urls) != 1 || urls[0].URL != "mailto:contact@example.com" || urls[0].Type != "mailto" {
+		t.Fatalf("urls = %#v", urls)
+	}
+
+	analyzer.AddSecretMatcher(SecretMatcher{"(pair) @match", func(n *Node) *Secret {
+		key := n.ChildByFieldName("key").DecodedString()
+		value := n.ChildByFieldName("value").DecodedString()
+		if key != "apiKey" || !strings.HasPrefix(value, "AUTH_") {
+			return nil
+		}
+		return &Secret{
+			Kind:     "fakeApi",
+			Data:     map[string]string{"key": key, "value": value},
+			Severity: SeverityLow,
+			Context:  n.Parent().AsMap(),
+		}
+	}})
+	secrets := analyzer.GetSecrets()
+	for _, secret := range secrets {
+		if secret.Kind == "fakeApi" && secret.Severity == SeverityLow {
+			return
+		}
+	}
+	t.Fatalf("missing custom fakeApi secret in %#v", secrets)
+}
+
 func TestJSLuiceCompatQuery(t *testing.T) {
 	analyzer := NewAnalyzer([]byte(`const x = "one"; const y = "two";`))
 	var got []string
@@ -113,6 +155,118 @@ func TestJSLuiceCompatQuery(t *testing.T) {
 	})
 	if len(got) != 2 || got[0] != "one" || got[1] != "two" {
 		t.Fatalf("query got %#v", got)
+	}
+}
+
+func TestJSLuiceCompatJQueryAjax(t *testing.T) {
+	analyzer := NewAnalyzer([]byte(`
+$.ajax({
+  method: "PUT",
+  url: "/api/v1/posts",
+  data:{ postId: 324 },
+  headers: {"Content-Type": "application/json", "x-backend": "prod"}
+})
+`))
+	urls := analyzer.GetURLs()
+	var found *URL
+	for _, u := range urls {
+		if u.Type == "$.ajax" {
+			found = u
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("missing $.ajax URL in %#v", urls)
+	}
+	if found.URL != "/api/v1/posts" || found.Method != "PUT" {
+		t.Fatalf("found = %#v", found)
+	}
+	if !contains(found.BodyParams, "postId") {
+		t.Fatalf("BodyParams = %#v, want postId", found.BodyParams)
+	}
+	if found.Headers["Content-Type"] != "application/json" || found.ContentType != "application/json" {
+		t.Fatalf("headers/content type = %#v %q", found.Headers, found.ContentType)
+	}
+}
+
+func TestJSLuiceCompatXHRHeaders(t *testing.T) {
+	analyzer := NewAnalyzer([]byte(`
+function callAPI(method, callback){
+  var xhr = new XMLHttpRequest();
+  xhr.open('GET', '/api/' + method + '?format=json', true);
+  xhr.setRequestHeader('Accept', 'application/json');
+  xhr.setRequestHeader('X-Env', 'staging');
+  xhr.send();
+}
+`))
+	urls := analyzer.GetURLs()
+	var found *URL
+	for _, u := range urls {
+		if u.Type == "XMLHttpRequest.open" {
+			found = u
+			break
+		}
+	}
+	if found == nil {
+		t.Fatalf("missing XHR URL in %#v", urls)
+	}
+	if found.URL != "/api/EXPR?format=json" || found.Method != "GET" {
+		t.Fatalf("found = %#v", found)
+	}
+	if found.Headers["Accept"] != "application/json" || found.Headers["X-Env"] != "staging" {
+		t.Fatalf("headers = %#v", found.Headers)
+	}
+}
+
+func TestJSLuiceCompatOtherSecrets(t *testing.T) {
+	source := []byte(`
+const gcp = {apiKey: "AIzaSyB47WKzDu9kkmFAsAYFlagkuJxdEXAMPLE"};
+const firebase = {
+  apiKey: "AIzaSyB47WKzDu9kkmFAsAYFlagkuJxdEXAMPLE",
+  authDomain: "someauthdomain.firebaseapp.com",
+  projectId: "someprojectid",
+  storageBucket: "somebucket.appspot.com"
+};
+const clone = "https://Some-User:ghp_BsE8x5x89jzGZxbQgFJNi4tkxs1F4EXAMPLE@github.com/foo/bar.git";
+`)
+	secrets := NewAnalyzer(source).GetSecrets()
+	kinds := map[string]bool{}
+	for _, s := range secrets {
+		kinds[s.Kind] = true
+	}
+	for _, want := range []string{"gcpKey", "firebase", "githubKey"} {
+		if !kinds[want] {
+			t.Fatalf("missing %s in %#v", want, secrets)
+		}
+	}
+}
+
+func TestJSLuiceCompatHTMLInlineScript(t *testing.T) {
+	analyzer := NewAnalyzer([]byte(`<script type="text/javascript"> var contextPath = '/somepage.html'; </script><html></html>`))
+	urls := analyzer.GetURLs()
+	for _, u := range urls {
+		if u.URL == "/somepage.html" {
+			return
+		}
+	}
+	t.Fatalf("missing inline script URL in %#v", urls)
+}
+
+func TestJSLuiceCompatCollapsedString(t *testing.T) {
+	cases := []struct {
+		js   []byte
+		want string
+	}{
+		{[]byte(`"./login.php?redirect="+url`), "./login.php?redirect=EXPR"},
+		{[]byte(`'/path/'+['one', 'two', 'three'].join('/')`), "/path/EXPR"},
+		{[]byte(`someVar`), "EXPR"},
+	}
+	for _, c := range cases {
+		root := NewAnalyzer(c.js).RootNode()
+		got := root.NamedChild(0).NamedChild(0).CollapsedString()
+		if got != c.want {
+			t.Fatalf("CollapsedString(%s) = %q, want %q", c.js, got, c.want)
+		}
 	}
 }
 
