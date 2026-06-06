@@ -161,6 +161,9 @@ func classifyPathLike(value string) bool {
 	if strings.HasPrefix(value, "//") {
 		return false
 	}
+	if looksLikeNoisePath(value) {
+		return false
+	}
 	if len(extractAbsoluteURLs(value)) > 0 {
 		return false
 	}
@@ -182,6 +185,89 @@ func classifyPathLike(value string) bool {
 		if first == '*' && len(value) > 1 && value[1] == '/' {
 			return hasPathSignal(value)
 		}
+	}
+	return false
+}
+
+// regexMetaSignals are substrings that occur in regex patterns but never in a
+// real URL path. Minified bundles store patterns as string literals (for
+// RegExp(...)), and the path classifier would otherwise report them as paths.
+var regexMetaSignals = []string{"(.*", "(.+", "[^", "(?", ".*)", ".+)"}
+
+// mimeTopLevelTypes are the IANA top-level media types; a `type/subtype` string
+// with one of these prefixes is a MIME type, not an endpoint.
+var mimeTopLevelTypes = []string{"text/", "application/", "image/", "audio/", "video/", "font/", "multipart/", "model/", "message/"}
+
+// uaTokens are well-known User-Agent product tokens that appear as bare
+// `Token/` (often `Token/version`) fragments in browser-detection code.
+var uaTokens = map[string]bool{
+	"OPR": true, "Edg": true, "Edge": true, "Chrome": true, "Chromium": true,
+	"CriOS": true, "Safari": true, "Firefox": true, "FxiOS": true, "MSIE": true,
+	"Trident": true, "SamsungBrowser": true, "Opera": true, "OPiOS": true,
+	"Mobile": true, "Gecko": true, "Version": true, "AppleWebKit": true,
+	"Mozilla": true, "Vivaldi": true, "YaBrowser": true, "UCBrowser": true,
+	"Konqueror": true, "Netscape": true,
+}
+
+// looksLikeNoisePath reports whether a path-shaped string literal is actually a
+// regex pattern, base64 alphabet dump, MIME type, or browser/UA token — the four
+// classes of non-endpoint that pollute path extraction on real minified bundles.
+func looksLikeNoisePath(value string) bool {
+	v := strings.TrimSpace(value)
+	if v == "" {
+		return false
+	}
+	// 1. regex patterns.
+	for _, sig := range regexMetaSignals {
+		if strings.Contains(v, sig) {
+			return true
+		}
+	}
+	// 2. base64 alphabet dump: long run of only base64 chars carrying '+' and '='.
+	if len(v) >= 32 && strings.ContainsRune(v, '+') && strings.ContainsRune(v, '=') && isAllBase64Chars(v) {
+		return true
+	}
+	// 3. MIME types (type/subtype with a known top-level type).
+	if isMIMEType(v) {
+		return true
+	}
+	// 4. bare UA product tokens (no leading slash; first segment is a UA token).
+	if !strings.HasPrefix(v, "/") {
+		head := v
+		if i := strings.IndexByte(v, '/'); i >= 0 {
+			head = v[:i]
+		}
+		if uaTokens[head] {
+			return true
+		}
+	}
+	return false
+}
+
+func isAllBase64Chars(v string) bool {
+	for _, r := range v {
+		if !((r >= 'A' && r <= 'Z') || (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '+' || r == '/' || r == '=') {
+			return false
+		}
+	}
+	return true
+}
+
+func isMIMEType(v string) bool {
+	for _, p := range mimeTopLevelTypes {
+		if !strings.HasPrefix(v, p) {
+			continue
+		}
+		rest := v[len(p):]
+		if rest == "" {
+			return false
+		}
+		for _, r := range rest {
+			if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '.' || r == '+' || r == '-' || r == '_') {
+				return false
+			}
+		}
+		return true
 	}
 	return false
 }
