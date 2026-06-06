@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>placer — pure-Go JS recon, in your browser</title>
+<style>
+  :root { color-scheme: dark; }
+  body { font: 14px/1.5 ui-monospace, SFMono-Regular, Menlo, monospace; margin: 0; background: #0d1117; color: #c9d1d9; }
+  header { padding: 18px 24px; border-bottom: 1px solid #21262d; }
+  h1 { margin: 0; font-size: 17px; font-weight: 600; }
+  h1 b { color: #58a6ff; }
+  .sub { color: #8b949e; font-size: 12.5px; margin-top: 5px; }
+  main { display: grid; grid-template-columns: 1fr 1fr; gap: 1px; background: #21262d; height: calc(100vh - 82px); }
+  @media (max-width: 760px) { main { grid-template-columns: 1fr; grid-template-rows: 1fr 1fr; height: calc(100vh - 96px); } }
+  .pane { background: #0d1117; display: flex; flex-direction: column; min-height: 0; }
+  .pane h2 { font-size: 11px; text-transform: uppercase; letter-spacing: .09em; color: #8b949e; margin: 0; padding: 11px 16px; border-bottom: 1px solid #21262d; }
+  .bar { padding: 9px 16px; border-bottom: 1px solid #21262d; display: flex; gap: 10px; align-items: center; }
+  textarea { flex: 1; resize: none; border: 0; background: transparent; color: #c9d1d9; padding: 14px 16px; font: inherit; outline: none; tab-size: 2; }
+  .out { flex: 1; overflow: auto; }
+  .row { padding: 7px 16px; border-bottom: 1px solid #161b22; display: flex; gap: 11px; align-items: baseline; }
+  .k { font-size: 9.5px; text-transform: uppercase; letter-spacing: .04em; padding: 2px 6px; border-radius: 4px; flex-shrink: 0; min-width: 58px; text-align: center; }
+  .k.endpoint { background: #1f6feb2e; color: #79b8ff; }
+  .k.url { background: #2386362e; color: #56d364; }
+  .k.path { background: #9e6a032e; color: #e3b341; }
+  .k.secret { background: #da36332e; color: #ff7b72; }
+  .v { word-break: break-all; }
+  .m { color: #6e7681; font-size: 11px; margin-left: auto; flex-shrink: 0; white-space: nowrap; }
+  button { font: inherit; background: #238636; color: #fff; border: 0; border-radius: 6px; padding: 6px 15px; cursor: pointer; font-weight: 600; }
+  button:hover { background: #2ea043; }
+  select { font: inherit; background: #21262d; color: #c9d1d9; border: 1px solid #30363d; border-radius: 6px; padding: 5px 6px; }
+  .status { color: #8b949e; font-size: 11.5px; margin-left: auto; }
+  .empty { padding: 16px; color: #6e7681; }
+</style>
+</head>
+<body>
+<header>
+  <h1><b>placer</b> · pure-Go JavaScript recon, running in your browser via WebAssembly</h1>
+  <div class="sub">No server. No CGo. The same engine that powers the CLI, compiled to wasm — paste JS, get endpoints &amp; secrets.</div>
+</header>
+<main>
+  <div class="pane">
+    <h2>JavaScript input</h2>
+    <div class="bar">
+      <button id="run">Analyze ▶</button>
+      <select id="mode" title="analysis mode">
+        <option value="all">all</option>
+        <option value="urls">urls</option>
+        <option value="secrets">secrets</option>
+      </select>
+      <span class="status" id="status">loading wasm…</span>
+    </div>
+    <textarea id="src" spellcheck="false"></textarea>
+  </div>
+  <div class="pane">
+    <h2>Findings</h2>
+    <div class="out" id="out"></div>
+  </div>
+</main>
+<script src="wasm_exec.js"></script>
+<script>
+const sample = `// paste your own, or analyze this:
+const API = "https://api.example.com";
+fetch(\`\${API}/v1/users\`, { method: "POST" });
+new WebSocket("wss://api.example.com/socket");
+navigator.sendBeacon("/collect", data);
+$.ajax({ url: "/internal/admin/delete" });
+import("/chunks/dashboard.js");
+const awsKey = "AKIA" + "IOSFODNN7EXAMPLE";
+const gh = atob("Z2hwX2FiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6QUJDREVG");
+`;
+const $ = s => document.querySelector(s);
+$("#src").value = sample;
+
+function escapeHtml(s){ return String(s).replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c])); }
+
+function render(json) {
+  let data;
+  try { data = JSON.parse(json); } catch { $("#out").innerHTML = '<div class="empty">'+escapeHtml(json)+'</div>'; return; }
+  const fs = data.findings || [];
+  if (!fs.length) { $("#out").innerHTML = '<div class="empty">no findings</div>'; return; }
+  $("#out").innerHTML = fs.map(f => {
+    const k = (f.kind||'').toLowerCase();
+    const meta = [f.method, f.rule, (typeof f.confidence === 'number') ? f.confidence.toFixed(2) : null].filter(Boolean).join(' · ');
+    return `<div class="row"><span class="k ${k}">${escapeHtml(f.kind||'?')}</span><span class="v">${escapeHtml(f.value||'')}</span><span class="m">${escapeHtml(meta)}</span></div>`;
+  }).join('');
+}
+
+function run() {
+  if (!window.placerAnalyze) return;
+  const t0 = performance.now();
+  const out = window.placerAnalyze($("#src").value, $("#mode").value);
+  render(out);
+  $("#status").textContent = `analyzed in ${(performance.now()-t0).toFixed(1)} ms`;
+}
+$("#run").onclick = run;
+$("#mode").onchange = run;
+
+const go = new Go();
+WebAssembly.instantiateStreaming(fetch("placer.wasm"), go.importObject).then(r => {
+  go.run(r.instance);
+  $("#status").textContent = "ready";
+  run();
+}).catch(e => { $("#status").textContent = "wasm load failed: " + e; });
+</script>
+</body>
+</html>
