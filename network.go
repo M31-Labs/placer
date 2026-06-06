@@ -7,7 +7,7 @@ import (
 	"github.com/odvcencio/gotreesitter"
 )
 
-var absoluteURLRe = regexp.MustCompile("(?i)\\b(?:https?:)?//[^\\s\"'<>`]+")
+var absoluteURLRe = regexp.MustCompile("(?i)\\b(?:(?:https?|wss?):)?//[^\\s\"'<>`]+")
 
 func extractNetworkFindings(path string, tree *gotreesitter.Tree, endpointsOnly bool) []Finding {
 	if tree == nil {
