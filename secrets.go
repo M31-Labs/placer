@@ -22,11 +22,11 @@ type secretCandidate struct {
 	RecoveredBy string
 }
 
-func extractSecretFindings(path string, tree *gotreesitter.Tree) ([]Finding, error) {
+func extractSecretFindings(path string, tree *gotreesitter.Tree, classifier secretClassifier) ([]Finding, error) {
 	candidates := collectSecretCandidates(path, tree)
 	var out []Finding
 	for _, candidate := range candidates {
-		matches, err := classifySecret(candidate)
+		matches, err := classifier.Classify(candidate)
 		if err != nil {
 			return nil, err
 		}

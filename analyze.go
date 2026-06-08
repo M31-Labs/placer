@@ -51,14 +51,24 @@ func AnalyzeSource(path string, source []byte, opts Options) (FileResult, error)
 	case ModeEndpoints:
 		out.Findings = extractNetworkFindings(path, tree, true)
 	case ModeSecrets:
-		out.Findings, err = extractSecretFindings(path, tree)
+		classifier, cerr := secretClassifierForPath(opts.SecretRulesPath)
+		if cerr != nil {
+			out.Error = cerr.Error()
+			return out, cerr
+		}
+		out.Findings, err = extractSecretFindings(path, tree, classifier)
 		if err != nil {
 			out.Error = err.Error()
 			return out, err
 		}
 	case ModeAll:
+		classifier, cerr := secretClassifierForPath(opts.SecretRulesPath)
+		if cerr != nil {
+			out.Error = cerr.Error()
+			return out, cerr
+		}
 		out.Findings = extractNetworkFindings(path, tree, false)
-		secretFindings, err := extractSecretFindings(path, tree)
+		secretFindings, err := extractSecretFindings(path, tree, classifier)
 		if err != nil {
 			out.Error = err.Error()
 			return out, err

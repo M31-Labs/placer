@@ -20,6 +20,10 @@ type Options struct {
 	Workers      int
 	MaxFileBytes int64
 	ParseTimeout time.Duration
+	// SecretRulesPath, when set, loads an external arbiter secret-rule pack
+	// (e.g. the Pro pack) instead of the embedded rules/secrets.arb. A pack
+	// that cannot be read or compiled is a hard error, not a silent fallback.
+	SecretRulesPath string
 }
 
 type Result struct {

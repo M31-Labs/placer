@@ -35,6 +35,7 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	fs.SetOutput(stderr)
 	lang := fs.String("lang", "", "language override: javascript, typescript, or tsx")
 	query := fs.String("query", "", "tree-sitter query for query mode")
+	rules := fs.String("rules", "", "path to an external arbiter secret-rule pack (.arb); overrides the embedded rules")
 	workers := fs.Int("workers", 0, "concurrent file workers")
 	maxBytes := fs.Int64("max-bytes", 10<<20, "maximum file size to analyze")
 	timeout := fs.Duration("timeout", 2*time.Second, "per-file parse timeout")
@@ -45,12 +46,13 @@ func run(args []string, stdin io.Reader, stdout, stderr io.Writer) error {
 	}
 
 	opts := placer.Options{
-		Mode:         mode,
-		Language:     *lang,
-		Query:        *query,
-		Workers:      *workers,
-		MaxFileBytes: *maxBytes,
-		ParseTimeout: *timeout,
+		Mode:            mode,
+		Language:        *lang,
+		Query:           *query,
+		Workers:         *workers,
+		MaxFileBytes:    *maxBytes,
+		ParseTimeout:    *timeout,
+		SecretRulesPath: *rules,
 	}
 
 	var result placer.Result
